@@ -195,7 +195,7 @@ public class HIDDeviceManager {
         filter.addAction(HIDDeviceManager.ACTION_USB_PERMISSION);
         // Apps and services that target Android 14 (API level 34) or higher and use context-registered
         // receivers are required to specify a flag to indicate whether or not the receiver should be
-        // exported to all other apps on the device
+        // exported to all other apps on the device 
         if (OperatingSystem.IsAndroidVersionAtLeast(34))
         {
             mContext.registerReceiver(mUsbBroadcast, filter, ReceiverFlags.Exported);
