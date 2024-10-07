@@ -193,8 +193,17 @@ public class HIDDeviceManager {
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         filter.addAction(HIDDeviceManager.ACTION_USB_PERMISSION);
-        mContext.registerReceiver(mUsbBroadcast, filter);
-
+        // Apps and services that target Android 14 (API level 34) or higher and use context-registered
+        // receivers are required to specify a flag to indicate whether or not the receiver should be
+        // exported to all other apps on the device
+        if (OperatingSystem.IsAndroidVersionAtLeast(34))
+        {
+            mContext.registerReceiver(mUsbBroadcast, filter, ReceiverFlags.Exported);
+        }
+        else
+        {
+            mContext.registerReceiver(mUsbBroadcast, filter);
+        }
         for (UsbDevice usbDevice : mUsbManager.getDeviceList().values()) {
             handleUsbDeviceAttached(usbDevice);
         }
@@ -391,7 +400,17 @@ public class HIDDeviceManager {
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-        mContext.registerReceiver(mBluetoothBroadcast, filter);
+        // Apps and services that target Android 14 (API level 34) or higher and use context-registered
+        // receivers are required to specify a flag to indicate whether or not the receiver should be
+        // exported to all other apps on the device
+        if (OperatingSystem.IsAndroidVersionAtLeast(34))
+        {
+            mContext.registerReceiver(mBluetoothBroadcast, filter, ReceiverFlags.Exported);
+        }
+        else
+        {
+            mContext.registerReceiver(mBluetoothBroadcast, filter);
+        }
 
         if (mIsChromebook) {
             mHandler = new Handler(Looper.getMainLooper());
