@@ -78,7 +78,8 @@ jobs:
         retention-days: 1
     - name: Push to Experimental Feed
       if: ${{ github.repository == 'tweggen/Silk.NET' && github.event_name != 'pull_request' }}
-      run: ./build.sh PushToNuGet --skip Clean Restore Compile Pack --nuget-feed https://tweggen.github.io/Silk.NET/nuget/experimental/index.json --nuget-username ${{ secrets.EXP_NUGET_USERNAME }} --nuget-password ${{ secrets.EXP_NUGET_PASSWORD }} --nuget-api-key ${{ secrets.EXP_NUGET_PASSWORD }}
+      run: ./build.sh PushToNuGet --skip Clean Restore Compile Pack --nuget-feed https://nuget.pkg.github.com/tweggen/index.json  --nuget-username ${{ secrets.EXP_NUGET_USERNAME }} --nuget-password ${{ secrets.EXP_NUGET_PASSWORD }} --nuget-api-key ${{ secrets.EXP_NUGET_PASSWORD }}
+      # https://tweggen.github.io/Silk.NET/nuget/experimental/index.json
     - name: Push to GitHub Packages
       if: ${{ github.repository == 'dotnet/Silk.NET' && github.event_name != 'pull_request' }}
       run: ./build.sh PushToNuGet --skip Clean Restore Compile Pack --nuget-feed https://nuget.pkg.github.com/dotnet/index.json --nuget-api-key ${{ secrets.GITHUB_TOKEN }}
