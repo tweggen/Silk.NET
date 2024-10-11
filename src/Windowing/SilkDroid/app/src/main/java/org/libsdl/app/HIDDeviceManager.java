@@ -196,7 +196,7 @@ public class HIDDeviceManager {
         // Apps and services that target Android 14 (API level 34) or higher and use context-registered
         // receivers are required to specify a flag to indicate whether or not the receiver should be
         // exported to all other apps on the device 
-        if (Build.VERSION.SDK_INT >= 34 && mContext.getApplicationInfo().targetSdkVersion >= 34)
+        if (Build.VERSION.SDK_INT >= 34 && mContext .getApplicationInfo().targetSdkVersion >= 34)
         {
             mContext.registerReceiver(mUsbBroadcast, filter, Context.RECEIVER_EXPORTED);
         }
