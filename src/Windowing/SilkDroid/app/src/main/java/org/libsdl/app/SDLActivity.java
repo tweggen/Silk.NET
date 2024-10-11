@@ -210,7 +210,8 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     // Main components
     protected static SDLActivity mSingleton;
     protected static SDLSurface mSurface;
-    protected static SDLDummyEdit mTextEdit;
+    protected static View mTextEdit;
+    private static SDLDummyEdit mDummyTextEdit;
     protected static boolean mScreenKeyboardShown;
     protected static ViewGroup mLayout;
     protected static SDLClipboardHandler mClipboardHandler;
@@ -301,6 +302,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
         mSingleton = null;
         mSurface = null;
         mTextEdit = null;
+        mDummyTextEdit = null;
         mLayout = null;
         mClipboardHandler = null;
         mCursors = new Hashtable<Integer, PointerIcon>();
@@ -795,14 +797,14 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
                 }
                 break;
             case COMMAND_TEXTEDIT_HIDE:
-                if (mTextEdit != null) {
+                if (mDummyTextEdit != null) {
                     // Note: On some devices setting view to GONE creates a flicker in landscape.
                     // Setting the View's sizes to 0 is similar to GONE but without the flicker.
                     // The sizes will be set to useful values when the keyboard is shown again.
-                    mTextEdit.setLayoutParams(new RelativeLayout.LayoutParams(0, 0));
+                    mDummyTextEdit.setLayoutParams(new RelativeLayout.LayoutParams(0, 0));
 
                     InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
-                    imm.hideSoftInputFromWindow(mTextEdit.getWindowToken(), 0);
+                    imm.hideSoftInputFromWindow(mDummyTextEdit.getWindowToken(), 0);
 
                     mScreenKeyboardShown = false;
 
@@ -1065,7 +1067,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
      */
     public static boolean isScreenKeyboardShown()
     {
-        if (mTextEdit == null) {
+        if (mDummyTextEdit == null) {
             return false;
         }
 
@@ -1267,19 +1269,20 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
             params.leftMargin = x;
             params.topMargin = y;
 
-            if (mTextEdit == null) {
-                mTextEdit = new SDLDummyEdit(SDL.getContext());
+            if (mDummyTextEdit == null) {
+                mDummyTextEdit = new SDLDummyEdit(SDL.getContext());
+                mTextEdit = mDummyTextEdit;
 
-                mLayout.addView(mTextEdit, params);
+                mLayout.addView(mDummyTextEdit, params);
             } else {
-                mTextEdit.setLayoutParams(params);
+                mDummyTextEdit.setLayoutParams(params);
             }
 
-            mTextEdit.setVisibility(View.VISIBLE);
-            mTextEdit.requestFocus();
+            mDummyTextEdit.setVisibility(View.VISIBLE);
+            mDummyTextEdit.requestFocus();
 
             InputMethodManager imm = (InputMethodManager) SDL.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            imm.showSoftInput(mTextEdit, 0);
+            imm.showSoftInput(mDummyTextEdit, 0);
 
             mScreenKeyboardShown = true;
         }
@@ -1890,4 +1893,216 @@ class SDLMain implements Runnable {
 
     }
 }
+
+
+
+class SDLInputConnection extends BaseInputConnection {
+
+    protected EditText mEditText;
+    protected String mCommittedText = "";
+
+    public SDLInputConnection(View targetView, boolean fullEditor) {
+        super(targetView, fullEditor);
+        mEditText = new EditText(SDL.getContext());
+    }
+
+    @Override
+    public Editable getEditable() {
+        return mEditText.getEditableText();
+    }
+
+    @Override
+    public boolean sendKeyEvent(KeyEvent event) {
+        /*
+         * This used to handle the keycodes from soft keyboard (and IME-translated input from hardkeyboard)
+         * However, as of Ice Cream Sandwich and later, almost all soft keyboard doesn't generate key presses
+         * and so we need to generate them ourselves in commitText.  To avoid duplicates on the handful of keys
+         * that still do, we empty this out.
+         */
+
+        /*
+         * Return DOES still generate a key event, however.  So rather than using it as the 'click a button' key
+         * as we do with physical keyboards, let's just use it to hide the keyboard.
+         */
+
+        if (event.getKeyCode() == KeyEvent.KEYCODE_ENTER) {
+            if (SDLActivity.onNativeSoftReturnKey()) {
+                return true;
+            }
+        }
+
+        return super.sendKeyEvent(event);
+    }
+
+    @Override
+    public boolean commitText(CharSequence text, int newCursorPosition) {
+        if (!super.commitText(text, newCursorPosition)) {
+            return false;
+        }
+        updateText();
+        return true;
+    }
+
+    @Override
+    public boolean setComposingText(CharSequence text, int newCursorPosition) {
+        if (!super.setComposingText(text, newCursorPosition)) {
+            return false;
+        }
+        updateText();
+        return true;
+    }
+
+    @Override
+    public boolean deleteSurroundingText(int beforeLength, int afterLength) {
+        if (!super.deleteSurroundingText(beforeLength, afterLength)) {
+            return false;
+        }
+        updateText();
+        return true;
+    }
+
+    protected void updateText() {
+        final Editable content = getEditable();
+        if (content == null) {
+            return;
+        }
+
+        String text = content.toString();
+        int compareLength = Math.min(text.length(), mCommittedText.length());
+        int matchLength, offset;
+
+        /* Backspace over characters that are no longer in the string */
+        for (matchLength = 0; matchLength < compareLength; ) {
+            int codePoint = mCommittedText.codePointAt(matchLength);
+            if (codePoint != text.codePointAt(matchLength)) {
+                break;
+            }
+            matchLength += Character.charCount(codePoint);
+        }
+        /* FIXME: This doesn't handle graphemes, like '🌬️' */
+        for (offset = matchLength; offset < mCommittedText.length(); ) {
+            int codePoint = mCommittedText.codePointAt(offset);
+            nativeGenerateScancodeForUnichar('\b');
+            offset += Character.charCount(codePoint);
+        }
+
+        if (matchLength < text.length()) {
+            String pendingText = text.subSequence(matchLength, text.length()).toString();
+            for (offset = 0; offset < pendingText.length(); ) {
+                int codePoint = pendingText.codePointAt(offset);
+                if (codePoint == '\n') {
+                    if (SDLActivity.onNativeSoftReturnKey()) {
+                        return;
+                    }
+                }
+                /* Higher code points don't generate simulated scancodes */
+                if (codePoint < 128) {
+                    nativeGenerateScancodeForUnichar((char)codePoint);
+                }
+                offset += Character.charCount(codePoint);
+            }
+            SDLInputConnection.nativeCommitText(pendingText, 0);
+        }
+        mCommittedText = text;
+    }
+
+    public static native void nativeCommitText(String text, int newCursorPosition);
+
+    public static native void nativeGenerateScancodeForUnichar(char c);
+}
+
+/* This is a fake invisible editor view that receives the input and defines the
+ * pan&scan region
+ */
+class SDLDummyEdit extends View implements View.OnKeyListener {
+    InputConnection ic;
+
+    public SDLDummyEdit(Context context) {
+        super(context);
+        setFocusableInTouchMode(true);
+        setFocusable(true);
+        setOnKeyListener(this);
+    }
+
+    @Override
+    public boolean onCheckIsTextEditor() {
+        return true;
+    }
+
+    @Override
+    public boolean onKey(View v, int keyCode, KeyEvent event) {
+        return SDLActivity.handleKeyEvent(v, keyCode, event, ic);
+    }
+
+    //
+    @Override
+    public boolean onKeyPreIme (int keyCode, KeyEvent event) {
+        // As seen on StackOverflow: http://stackoverflow.com/questions/7634346/keyboard-hide-event
+        // FIXME: Discussion at http://bugzilla.libsdl.org/show_bug.cgi?id=1639
+        // FIXME: This is not a 100% effective solution to the problem of detecting if the keyboard is showing or not
+        // FIXME: A more effective solution would be to assume our Layout to be RelativeLayout or LinearLayout
+        // FIXME: And determine the keyboard presence doing this: http://stackoverflow.com/questions/2150078/how-to-check-visibility-of-software-keyboard-in-android
+        // FIXME: An even more effective way would be if Android provided this out of the box, but where would the fun be in that :)
+        if (event.getAction()==KeyEvent.ACTION_UP && keyCode == KeyEvent.KEYCODE_BACK) {
+            if (SDLActivity.mTextEdit != null && SDLActivity.mTextEdit.getVisibility() == View.VISIBLE) {
+                SDLActivity.onNativeKeyboardFocusLost();
+            }
+        }
+        return super.onKeyPreIme(keyCode, event);
+    }
+
+    @Override
+    public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
+        ic = new SDLInputConnection(this, true);
+
+        outAttrs.inputType = InputType.TYPE_CLASS_TEXT |
+                             InputType.TYPE_TEXT_FLAG_MULTI_LINE;
+        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI |
+                              EditorInfo.IME_FLAG_NO_FULLSCREEN /* API 11 */;
+
+        return ic;
+    }
+}
+
+
+class SDLClipboardHandler implements
+    ClipboardManager.OnPrimaryClipChangedListener {
+
+    protected ClipboardManager mClipMgr;
+
+    SDLClipboardHandler() {
+       mClipMgr = (ClipboardManager) SDL.getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+       mClipMgr.addPrimaryClipChangedListener(this);
+    }
+
+    public boolean clipboardHasText() {
+       return mClipMgr.hasPrimaryClip();
+    }
+    public String clipboardGetText() {
+        ClipData clip = mClipMgr.getPrimaryClip();
+        if (clip != null) {
+            ClipData.Item item = clip.getItemAt(0);
+            if (item != null) {
+                CharSequence text = item.getText();
+                if (text != null) {
+                    return text.toString();
+                }
+            }
+        }
+        return null;
+    }
+
+    public void clipboardSetText(String string) {
+       mClipMgr.removePrimaryClipChangedListener(this);
+       ClipData clip = ClipData.newPlainText(null, string);
+       mClipMgr.setPrimaryClip(clip);
+       mClipMgr.addPrimaryClipChangedListener(this);
+    }
+
+    @Override
+    public void onPrimaryClipChanged() {
+        SDLActivity.onNativeClipboardChanged();
+    }
+}
+
 
