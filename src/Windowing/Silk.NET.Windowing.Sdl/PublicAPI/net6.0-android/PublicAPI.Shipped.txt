@@ -127,7 +127,7 @@ static Org.Libsdl.App.SDLActivity.MTextEdit.set -> void
 static Org.Libsdl.App.SDLActivity.NativeAddTouch(int p0, string? p1) -> void
 static Org.Libsdl.App.SDLActivity.NativeFocusChanged(bool p0) -> void
 static Org.Libsdl.App.SDLActivity.NativeGetHint(string? p0) -> string?
-static Org.Libsdl.App.SDLActivity.NativeGetHintBoolean(string? p0, bool) -> bool
+static Org.Libsdl.App.SDLActivity.NativeGetHintBoolean(string? p0, bool p1) -> bool
 static Org.Libsdl.App.SDLActivity.NativeGetVersion() -> string?
 static Org.Libsdl.App.SDLActivity.NativeLowMemory() -> void
 static Org.Libsdl.App.SDLActivity.NativePause() -> void
@@ -164,7 +164,7 @@ static Org.Libsdl.App.SDLActivity.OpenURL(string? url) -> int
 static Org.Libsdl.App.SDLActivity.RequestPermission(string? permission, int requestCode) -> void
 static Org.Libsdl.App.SDLActivity.SendMessage(int command, int param) -> bool
 static Org.Libsdl.App.SDLActivity.SetActivityTitle(string? title) -> bool
-static Org.Libsdl.App.SDLActivity.DestroyCustomCursor(int cursorID) -> bool
+static Org.Libsdl.App.SDLActivity.DestroyCustomCursor(int cursorID) -> void
 static Org.Libsdl.App.SDLActivity.SetCustomCursor(int cursorID) -> bool
 static Org.Libsdl.App.SDLActivity.SetOrientation(int w, int h, bool resizable, string? hint) -> void
 static Org.Libsdl.App.SDLActivity.SetRelativeMouseEnabled(bool enabled) -> bool
